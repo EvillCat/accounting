@@ -29,13 +29,11 @@ public class TransactionService {
     public void startTransactions(Account firstAccount, Account secondAccount) {
         Transaction firstTransaction = new Transaction(firstAccount, secondAccount, firstTransactionScheduleFuture);
         firstTransactionScheduleFuture =
-                executorService.scheduleWithFixedDelay(
-                        firstTransaction, createTimeDelay(), createTimeDelay(), TimeUnit.MILLISECONDS);
+                executorService.schedule(firstTransaction, createTimeDelay(), TimeUnit.MILLISECONDS);
 
         Transaction secondTransaction = new Transaction(secondAccount, firstAccount, secondTransactionScheduleFuture);
         secondTransactionScheduleFuture =
-                executorService.scheduleWithFixedDelay(
-                        secondTransaction, createTimeDelay(), createTimeDelay(), TimeUnit.MILLISECONDS);
+                executorService.schedule(secondTransaction, createTimeDelay(), TimeUnit.MILLISECONDS);
     }
 
     private long createTimeDelay() {
@@ -53,7 +51,7 @@ public class TransactionService {
         if (future != null) {
             future.cancel(true);
         }
-        executorService.scheduleWithFixedDelay(runnable, createTimeDelay(), createTimeDelay(), TimeUnit.MILLISECONDS);
+        executorService.schedule(runnable, createTimeDelay(), TimeUnit.MILLISECONDS);
     }
 
     private class Transaction implements Runnable {
@@ -70,13 +68,19 @@ public class TransactionService {
 
         @Override
         public void run() {
-            if (transactionsCountLimit.get() != 0) {
+            if(transactionsCountLimit.get() == 0) {
+                executorService.shutdown();
+            } else {
                 makeTransaction(debitAccount, creditAccount);
-                transactionsCountLimit.decrementAndGet();
+                decrementTransaction();
                 LOG.info("Транзакций осталось: " + transactionsCountLimit.get());
                 changeScheduleTime(transactionScheduleFuture, this);
-            } else {
-                executorService.shutdown();
+            }
+        }
+
+        private void decrementTransaction() {
+            if (transactionsCountLimit.get() != 0) {
+                transactionsCountLimit.decrementAndGet();
             }
         }
     }
